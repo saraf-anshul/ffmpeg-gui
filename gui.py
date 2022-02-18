@@ -26,9 +26,9 @@ def findVideoResolution(pathToInputVideo):
 	height = ffprobeOutput['streams'][0]['height']
 	width = ffprobeOutput['streams'][0]['width']
 
-	return height, width
+	return width, height
 
-# returns a `scale w:h` string for ffmpeg
+# returns a `scale w:h` string for ffmpeg cli
 def getAspectRatio( w, h ):
 	w = w * 2 # seperate alpha 
 	if( w <= 720 and h <= 720 ):
@@ -46,15 +46,11 @@ def getAspectRatio( w, h ):
 		h = int(w / ar)
 	return f"scale={w}:{h}"
 
-
 def runScript(fileName, outputFileName):
-	# bundle_dir = getattr(sys, '_MEIPASS', os.path.abspath(os.path.dirname(__file__)))
-	
-	# videoconvetor = os.path.abspath(os.path.join(bundle_dir,'videoconvetor.sh'))
-
-	# os.system(f"chmod +x {videoconvetor}")
 	w, h = findVideoResolution(fileName)
+	print(w, h)
 	scale_var = getAspectRatio(w, h)
+	print(scale_var)
 	script = f'ffmpeg -an -i {fileName} -filter_complex "[0:v]alphaextract[a]; [0:v][a]hstack=inputs=2[n];[n]fps=fps=30[k];[k]{scale_var}"  -c:v libx264 -pix_fmt yuv420p -movflags +faststart -profile:v baseline -level 3.0 {outputFileName} -y'
 	print(script)
 	os.system(script)
