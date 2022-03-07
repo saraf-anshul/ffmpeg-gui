@@ -51,7 +51,7 @@ def runScript(fileName, outputFileName):
 	print(w, h)
 	scale_var = getAspectRatio(w, h)
 	print(scale_var)
-	script = f'ffmpeg -an -i {fileName} -filter_complex "[0:v]alphaextract[a]; [0:v][a]hstack=inputs=2[n];[n]fps=fps=30[k];[k]{scale_var}"  -c:v libx264 -pix_fmt yuv420p -movflags +faststart -profile:v baseline -level 3.0 {outputFileName} -y'
+	script = f'ffmpeg -an -i "{fileName}" -filter_complex "[0:v]alphaextract[a]; [0:v][a]hstack=inputs=2[n];[n]fps=fps=30[k];[k]{scale_var}"  -c:v libx264 -pix_fmt yuv420p -movflags +faststart -profile:v baseline -level 3.0 "{outputFileName}" -y'
 	print(script)
 	os.system(script)
 
@@ -150,7 +150,7 @@ class MainWidget(QMainWindow):
 		options |= QFileDialog.DontUseNativeDialog
 		open_loc = ""
 
-		fileName, _ = QFileDialog.getOpenFileNames(self,"Select files", open_loc,"All Files (*);;Video Files (*.mp4)", options=options)
+		fileName, _ = QFileDialog.getOpenFileNames(self,"Select files", open_loc,"All Files (*);;Video Files (*.mov)", options=options)
 		if fileName:
 			print(fileName)
 			self.setFilename(fileName)
@@ -171,8 +171,11 @@ class MainWidget(QMainWindow):
 		outputDir = self.labelOut.text()
 
 		self.button_run.setStyleSheet("QPushButton {background-color:#B33F40; border-radius: 4px; min-height: 22px;}")
+		self.button_run.setText(f"Running...")
+		self.button_run.repaint()
+		self.button_run.setEnabled(False)
+
 		for idx ,file in enumerate(self.selectedFiles):
-			self.button_run.setText(f"Running... {idx + 1}")
 			newFileName = outputDir + f"/{file.split('/')[-1].replace('.' ,'_')}_converted_mp4.mp4"
 			runScript(file , newFileName)
 
@@ -181,6 +184,8 @@ class MainWidget(QMainWindow):
 
 		self.button_run.setText("Run Again")
 		self.button_run.setStyleSheet("QPushButton {background-color:#48A14D; border-radius: 4px; min-height: 22px;}")
+		self.button_run.repaint()
+		self.button_run.setEnabled(True)
 
 	def dragEnterEvent(self, event):
 		if event.mimeData().hasUrls():
