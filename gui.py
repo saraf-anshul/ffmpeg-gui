@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-from PyQt5.QtWidgets import QMainWindow, QApplication, QWidget, QPushButton, QFileDialog, QLabel, QVBoxLayout, QHBoxLayout, QLineEdit, QGroupBox
+from PyQt5.QtWidgets import QMainWindow, QApplication, QWidget, QPushButton, QFileDialog, QLabel, QVBoxLayout, QHBoxLayout, QLineEdit, QGroupBox, QFrame
 from PyQt5.QtGui import QIcon
 from PyQt5.QtCore import pyqtSlot ,Qt
 import sys, os
@@ -57,19 +57,80 @@ def runScript(rgbFileName, alphaFileName, outputFileName):
 	print(script)
 	os.system(script)
 
+class FileInfoAndSelectorBox(QWidget):
+	def __init__(self, type):
+		super().__init__()
+
+		self.selectedFiles = []
+
+		self.setAcceptDrops(True)
+
+		#### V-box for column
+		vBoxLayout0 = QVBoxLayout(self)
+
+		##### button select
+		self.button = QPushButton(f'Select {type} file(s)', self)
+		self.button.setToolTip(f'Select {type} file for conversion')
+		self.button.clicked.connect(self.on_click_select)
+		vBoxLayout0.addWidget(self.button)
+		#####
+
+		##### textview says "selected Dir"
+		self.labelSelect = QLabel('', self)
+		self.labelSelect.setText(f"Selected {type} Files:")
+		self.labelSelect.setAlignment(Qt.AlignCenter)
+		vBoxLayout0.addWidget(self.labelSelect)
+		#####
+
+		##### filename textview
+		self.twFlies = QLabel(f'Selected {type} files', self)
+		self.twFlies.setText(f"No {type} files selected")
+		self.twFlies.setAlignment(Qt.AlignCenter)
+		vBoxLayout0.addWidget(self.twFlies)
+		#####
+
+
+	# select file onClick
+	@pyqtSlot()
+	def on_click_select(self):
+		options = QFileDialog.Options()
+		options |= QFileDialog.DontUseNativeDialog
+		open_loc = getDefaultStorageLocation()
+
+		fileName, _ = QFileDialog.getOpenFileNames(self,"Select input files", open_loc,"All Files (*);;Video Files (*.mov)", options=options)
+		if fileName:
+			print(fileName)
+			self.selectedFiles = fileName
+			self.setFilename(self.twFlies, fileName)
+
+	def dragEnterEvent(self, event):
+		if event.mimeData().hasUrls():
+			event.accept()
+		else:
+			event.ignore()
+
+	def dropEvent(self, event):
+		files = [u.toLocalFile() for u in event.mimeData().urls()]
+		for f in files:
+			print(f)
+		self.selectedFiles = files
+		self.setFilename(self.twFlies , files)
+
+	def setFilename(self ,view, names):
+		text = "\n".join([i.split('/')[-1] for i in names])
+		view.setText(text)
+		view.adjustSize()
+
 
 class MainWidget(QMainWindow):
 	def __init__(self):
 		super().__init__()
 
-		self.selectedFilesRGB = []
-		self.selectedFilesAlpha = []
 		self.saveLocation = ""
 
 		### window attrs
 		self.setWindowTitle("Shutter-lib GUI")
 		self.resize(300, 300)
-		# self.setAcceptDrops(True)
 		wid = QWidget(self)
 		self.setCentralWidget(wid)
 		layout = QVBoxLayout()
@@ -80,64 +141,11 @@ class MainWidget(QMainWindow):
 		hBoxRA = QGroupBox()
 		hBoxRALayout = QHBoxLayout()
 
-		#### V-box for RGB column
-		vBox0 = QGroupBox()
-		vBoxLayout0 = QVBoxLayout()
+		self.rgbLayout = FileInfoAndSelectorBox("RGB")
+		self.alphaLayout = FileInfoAndSelectorBox("Alpha")
 
-		##### button select RGB
-		self.buttonRGB = QPushButton('Select RGB file(s)', self)
-		self.buttonRGB.setToolTip('Select RGB file for conversion')
-		self.buttonRGB.clicked.connect(self.on_clickRGB)
-		vBoxLayout0.addWidget(self.buttonRGB)
-		#####
-
-		##### textview says "selected Dir RGB"
-		self.labelSelectRGB = QLabel('', self)
-		self.labelSelectRGB.setText("Selected RGB Files:")
-		self.labelSelectRGB.setAlignment(Qt.AlignCenter)
-		vBoxLayout0.addWidget(self.labelSelectRGB)
-		#####
-
-		##### filename-RGB textview
-		self.twRGB = QLabel('Selected RGB files', self)
-		self.twRGB.setText("No files selected")
-		self.twRGB.setAlignment(Qt.AlignCenter)
-		vBoxLayout0.addWidget(self.twRGB)
-		#####
-
-		vBox0.setLayout(vBoxLayout0)
-		####
-
-		#### V-box for Alpha column
-		vBox1 = QGroupBox()
-		vBoxLayout1 = QVBoxLayout()
-
-		##### button select Alpha
-		self.buttonAlpha = QPushButton('Select Alpha file(s)', self)
-		self.buttonAlpha.setToolTip('Select Alpha file for conversion')
-		self.buttonAlpha.clicked.connect(self.on_clickAlpha)
-		vBoxLayout1.addWidget(self.buttonAlpha)
-		#####
-
-		##### textview says "selected Dir Alpha"
-		self.labelSelectAlpha = QLabel('', self)
-		self.labelSelectAlpha.setText("Selected Alpha Files:")
-		self.labelSelectAlpha.setAlignment(Qt.AlignCenter)
-		vBoxLayout1.addWidget(self.labelSelectAlpha)
-		#####
-
-		##### filename-Alpha textview
-		self.twAlpha = QLabel('Selected RGB files', self)
-		self.twAlpha.setText("No files selected")
-		self.twAlpha.setAlignment(Qt.AlignCenter)
-		vBoxLayout1.addWidget(self.twAlpha)
-		#####
-
-		vBox1.setLayout(vBoxLayout1)
-		####
-
-		hBoxRALayout.addWidget(vBox0)
-		hBoxRALayout.addWidget(vBox1)
+		hBoxRALayout.addWidget(self.rgbLayout)
+		hBoxRALayout.addWidget(self.alphaLayout)
 		hBoxRA.setLayout(hBoxRALayout)
 
 		layout.addWidget(hBoxRA)
@@ -168,11 +176,9 @@ class MainWidget(QMainWindow):
 		try:
 			with open( getLocationsFile() ,'r' ) as F:
 				self.updateSaveLocation( json.load(F)['last'] )
-				# self.labelOut.setText( json.load(F)['last'] )
 		except:
 			with open( getLocationsFile() ,'w' ) as F:
 				json.dump({'last' : getDefaultStorageLocation()} ,F)
-			# self.labelOut.setText('No save location selected')
 			self.updateSaveLocation( getDefaultStorageLocation() )
 		###
 
@@ -183,38 +189,12 @@ class MainWidget(QMainWindow):
 		###
 
 		### run button
-		self.buttonRGB_run = QPushButton('Run', self)
-		self.buttonRGB_run.setToolTip('Run Script')
-		self.buttonRGB_run.setStyleSheet("QPushButton {background-color:#48A14D; border-radius: 4px; min-height: 22px;}")
-		self.buttonRGB_run.clicked.connect(self.run_script)
-		layout.addWidget(self.buttonRGB_run)
+		self.button_run = QPushButton('Run', self)
+		self.button_run.setToolTip('Run Script')
+		self.button_run.setStyleSheet("QPushButton {background-color:#48A14D; border-radius: 4px; min-height: 22px;}")
+		self.button_run.clicked.connect(self.run_script)
+		layout.addWidget(self.button_run)
 		###
-		
-	# select file onClick (RGB)
-	@pyqtSlot()
-	def on_clickRGB(self):
-		options = QFileDialog.Options()
-		options |= QFileDialog.DontUseNativeDialog
-		open_loc = getDefaultStorageLocation()
-
-		fileName, _ = QFileDialog.getOpenFileNames(self,"Select RGB files", open_loc,"All Files (*);;Video Files (*.mov)", options=options)
-		if fileName:
-			print(fileName)
-			self.selectedFilesRGB = fileName
-			self.setFilename(self.twRGB, fileName)
-
-	# select file onClick (Alpha)
-	@pyqtSlot()
-	def on_clickAlpha(self):
-		options = QFileDialog.Options()
-		options |= QFileDialog.DontUseNativeDialog
-		open_loc = getDefaultStorageLocation()
-
-		fileName, _ = QFileDialog.getOpenFileNames(self,"Select Alpha files", open_loc,"All Files (*);;Video Files (*.mov)", options=options)
-		if fileName:
-			print(fileName)
-			self.selectedFilesAlpha = fileName
-			self.setFilename(self.twAlpha, fileName)
 
 	# download location onClick
 	@pyqtSlot()
@@ -230,45 +210,26 @@ class MainWidget(QMainWindow):
 	def run_script(self):
 		outputDir = self.saveLocation
 
-		self.buttonRGB_run.setStyleSheet("QPushButton {background-color:#B33F40; border-radius: 4px; min-height: 22px;}")
-		self.buttonRGB_run.setText(f"Running...")
-		self.buttonRGB_run.repaint()
-		self.buttonRGB_run.setEnabled(False)
+		self.button_run.setStyleSheet("QPushButton {background-color:#B33F40; border-radius: 4px; min-height: 22px;}")
+		self.button_run.setText(f"Running...")
+		self.button_run.repaint()
+		self.button_run.setEnabled(False)
 
-		for fileRGB ,fileAlpha in zip(self.selectedFilesRGB, self.selectedFilesAlpha):
+		for fileRGB ,fileAlpha in zip(self.rgbLayout.selectedFiles, self.alphaLayout.selectedFiles):
 			newFileName = outputDir + f"/{fileRGB.split('/')[-1].replace('.' ,'_')}_converted_mp4.mp4"
 			runScript(fileRGB ,fileAlpha , newFileName)
 
 		with open( getLocationsFile() ,'w' ) as F:
 			json.dump({'last' : outputDir} ,F)
 
-		self.buttonRGB_run.setText("Run Again")
-		self.buttonRGB_run.setStyleSheet("QPushButton {background-color:#48A14D; border-radius: 4px; min-height: 22px;}")
-		self.buttonRGB_run.repaint()
-		self.buttonRGB_run.setEnabled(True)
-
-	# def dragEnterEvent(self, event):
-	# 	if event.mimeData().hasUrls():
-	# 		event.accept()
-	# 	else:
-	# 		event.ignore()
-
-	# def dropEvent(self, event):
-	# 	files = [u.toLocalFile() for u in event.mimeData().urls()]
-	# 	for f in files:
-	# 		print(f)
-	# 	self.setFilename(files)
+		self.button_run.setText("Run Again")
+		self.button_run.setStyleSheet("QPushButton {background-color:#48A14D; border-radius: 4px; min-height: 22px;}")
+		self.button_run.repaint()
+		self.button_run.setEnabled(True)
 
 	def updateSaveLocation(self, loc):
 		self.labelOut.setText(loc)
 		self.saveLocation = loc
-
-
-	def setFilename(self ,view, names):
-		# self.selectedFiles = names
-		text = "\n".join([i.split('/')[-1] for i in names])
-		view.setText(text)
-		view.adjustSize()
 
 
 if __name__ == '__main__':
