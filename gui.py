@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-from PyQt5.QtWidgets import QMainWindow, QApplication, QWidget, QPushButton, QFileDialog, QLabel, QVBoxLayout, QHBoxLayout, QLineEdit, QGroupBox, QFrame
+from PyQt5.QtWidgets import QMainWindow, QApplication, QWidget, QPushButton, QFileDialog, QLabel, QVBoxLayout, QHBoxLayout, QLineEdit, QGroupBox, QFrame, QRadioButton
 from PyQt5.QtGui import QIcon
 from PyQt5.QtCore import pyqtSlot ,Qt
 import sys, os
@@ -30,31 +30,29 @@ def findVideoResolution(pathToInputVideo):
 
 # Returns a `scale w:h` string for ffmpeg cli
 # H and W are EVEN
-def getAspectRatio( w, h ):
+def getAspectRatio( w, h, SIZE = 720):
 	w = w * 2 # total , including alpha too 
-	if( w <= 720 and h <= 720 ):
+	if( w <= SIZE and h <= SIZE ):
 		return f"scale={w - (w%2)}:{h - (h%2)}"
 	
 	ar = w / h
 
 	if( w <= h ):
-		# set h to 720 and calc w
-		h = 720
+		# set h to SIZE and calc w
+		h = SIZE
 		w = int(ar * h)
 	else: # w < h
-		# set w to 720 and calc w
-		w = 720
+		# set w to SIZE and calc w
+		w = SIZE
 		h = int(w / ar)
 	return f"scale={w - (w%2)}:{h - (h%2)}"
 
-def runScript(rgbFileName, alphaFileName, outputFileName):
+def runScript(rgbFileName, alphaFileName, outputFileName, SIZE = 720):
 	w, h = findVideoResolution(rgbFileName) # assuming dimens of rgb == alpha
-	print(w, h)
-	scale_var = getAspectRatio(w, h)
-	print(scale_var)
+	# print(w, h, SIZE)
+	scale_var = getAspectRatio(w, h, SIZE)
 	script = f'ffmpeg -an -i "{rgbFileName}" -i "{alphaFileName}" -filter_complex "[0:v][1:v]hstack=inputs=2[n];[n]fps=fps=30[k];[k]{scale_var}" -c:v libx264 -pix_fmt yuv420p -movflags +faststart -profile:v baseline -level 3.0 "{outputFileName}" -y'
-	# script = f'ffmpeg -an -i "{fileName}" -filter_complex "[0:v]alphaextract[a]; [0:v][a]hstack=inputs=2[n];[n]fps=fps=30[k];[k]{scale_var}"  -c:v libx264 -pix_fmt yuv420p -movflags +faststart -profile:v baseline -level 3.0 "{outputFileName}" -y'
-	print(script)
+	# print(script)
 	os.system(script)
 
 class FileInfoAndSelectorBox(QWidget):
@@ -122,6 +120,41 @@ class FileInfoAndSelectorBox(QWidget):
 		view.adjustSize()
 
 
+class CustomRadioButtonGroup(QWidget):
+	def __init__(self):
+		super().__init__()
+
+		self.resolution = 720
+
+		layout = QHBoxLayout(self)
+
+		label = QLabel('Output video resolution :')
+		layout.addWidget(label)
+
+		vBox = QGroupBox()
+		vLayout = QVBoxLayout()
+
+		### Radio button for output res selection
+		self.rBtn720 = QRadioButton("720p")
+		self.rBtn720.setChecked(True)
+		self.rBtn1080 = QRadioButton("1080p")
+		self.rBtn720.toggled.connect(self.on_click_r_btn)
+		self.rBtn1080.toggled.connect(self.on_click_r_btn)
+
+		vLayout.addWidget(self.rBtn720)
+		vLayout.addWidget(self.rBtn1080)
+
+		vBox.setLayout(vLayout)
+		layout.addWidget(vBox)
+		###
+
+	@pyqtSlot()
+	def on_click_r_btn(self):
+		radioBtn = self.sender()
+		self.resolution = int(radioBtn.text()[:-1])
+		# print( f"Quality set to {radioBtn.text()[:-1]}" )
+
+
 class MainWidget(QMainWindow):
 	def __init__(self):
 		super().__init__()
@@ -149,6 +182,7 @@ class MainWidget(QMainWindow):
 		hBoxRA.setLayout(hBoxRALayout)
 
 		layout.addWidget(hBoxRA)
+		###
 
 		### horizontal layout (Output)
 		horizontalGroupBox = QGroupBox()
@@ -188,6 +222,11 @@ class MainWidget(QMainWindow):
 		layout.addWidget(self.outputDir)
 		###
 
+		### Radio Group for 1080, 720p selection
+		self.radioGroup = CustomRadioButtonGroup()
+		layout.addWidget(self.radioGroup)
+		###
+
 		### run button
 		self.button_run = QPushButton('Run', self)
 		self.button_run.setToolTip('Run Script')
@@ -204,11 +243,12 @@ class MainWidget(QMainWindow):
 		dirName = QFileDialog().getExistingDirectory(self, 'Select an directory to save files' ,dir)
 		if dirName:
 			print(dirName)
-			self.updateSaveLocation(dirName) ## here too
+			self.updateSaveLocation(dirName)
 
 	@pyqtSlot()
 	def run_script(self):
 		outputDir = self.saveLocation
+		res = self.radioGroup.resolution
 
 		self.button_run.setStyleSheet("QPushButton {background-color:#B33F40; border-radius: 4px; min-height: 22px;}")
 		self.button_run.setText(f"Running...")
@@ -216,8 +256,8 @@ class MainWidget(QMainWindow):
 		self.button_run.setEnabled(False)
 
 		for fileRGB ,fileAlpha in zip(self.rgbLayout.selectedFiles, self.alphaLayout.selectedFiles):
-			newFileName = outputDir + f"/{fileRGB.split('/')[-1].replace('.' ,'_')}_converted_mp4.mp4"
-			runScript(fileRGB ,fileAlpha , newFileName)
+			newFileName = outputDir + f"/{fileRGB.split('/')[-1].replace('.' ,'_')}_converted_{res}_mp4.mp4"
+			runScript(fileRGB ,fileAlpha, newFileName, res)
 
 		with open( getLocationsFile() ,'w' ) as F:
 			json.dump({'last' : outputDir} ,F)
